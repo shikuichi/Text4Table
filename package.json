@@ -1,0 +1,18 @@
+{
+  "name": "text-to-table-lite",
+  "version": "1.0.0",
+  "description": "スペース区切りテキストからHTML/TSVテーブルを生成するブラウザ完結型ツール",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "keywords": [
+    "table",
+    "tsv",
+    "html-table",
+    "converter",
+    "standalone"
+  ],
+  "author": "しくいち (Shikuichi)",
+  "license": "GPL-3.0-or-later"
+}

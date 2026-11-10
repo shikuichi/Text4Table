@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<!--
+作品名：テキストから表を作るツール
+バージョン更新日：2026-11-11
+作者 ：しくいち (Shikuichi)
+著作権：Copyright (C) 2016-2026 Shikuichi
+
+【ライセンスについて】
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>テキストから表を作るツール</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #f5f7fa; }
+    .container { max-width: 960px; margin: 2rem auto; background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,.08); }
+    
+    h1 { margin: 0 0 1rem; color: #222; font-size: 1.8rem; text-align: center; }
+    p { color: #555; line-height: 1.6; margin-bottom: 1rem; }
+    textarea { width: 100%; height: 160px; padding: 12px; font-family: 'Courier New', monospace; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; resize: vertical; margin-bottom: 1rem; box-sizing: border-box; }
+    .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 1rem; }
+    button { padding: 0.6rem 1.2rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: .2s; }
+    .btn-primary { background: #0d6efd; color: white; }
+    .btn-primary:hover { background: #0b5ed7; }
+    .btn-success { background: #198754; color: white; }
+    .btn-success:hover { background: #157347; }
+    .btn-danger { background: #dc3545; color: white; }
+    .btn-danger:hover { background: #bb2d3b; }
+    .btn-copy { background: #6c757d; color: white; font-size: 0.85rem; padding: 0.4rem 0.8rem; }
+    .btn-copy:hover { background: #5a6268; }
+    select, input[type="checkbox"] { font-size: 14px; }
+    label { display: flex; align-items: center; gap: 6px; font-size: 14px; white-space: nowrap; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 14px; }
+    th, td { border: 1px solid #ccc; padding: 0.6rem 0.8rem; }
+    th { background: #f8f9fa; font-weight: 600; }
+    th.title { background: #e9ecef; font-size: 1.1em; font-weight: bold; }
+
+    .text-left th, .text-left td { text-align: left; }
+    .text-center th, .text-center td { text-align: center; }
+    .text-right th, .text-right td { text-align: right; }
+
+    #output { margin-top: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; overflow-x: auto; }
+    .copy-msg { color: #198754; font-size: 0.9rem; margin-left: 8px; display: none; }
+    .footer { margin-top: 2rem; text-align: center; color: #777; font-size: 0.85rem; line-height: 1.5; }
+    .copyright { font-size: 0.9rem; color: #999; margin-top: 0.5rem; }
+
+    @media print {
+      .no-print {
+        display: block !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>テキストから表を作るツール</h1>
+  <p>
+    半角スペースで区切ることで表を作れるツールの軽量版です。<br>
+    入力内容の処理はブラウザ内ですべて完結しているため、外部への送信・記録は一切行われません。<br>
+    オフライン環境（ローカルファイル実行など）でもそのまま使用できます。<br>
+    ※入力内容の自動保存機能はブラウザの「ローカルストレージ」機能を使用しています。
+  </p>
+  <p>
+    一行目は「表のタイトル」が付きます（入力例を参考にしてみてください）。
+  </p>
+
+  <textarea id="input" style="height: 300px;" placeholder="入力例：
+◯◯県の受信調査(受信山)
+放送局名 周波数(MHz) 備考
+FM瀬戸内 76.2 良好に受信可能
+J-BEAT 81.3 ノイズが目立つ
+
+※一行目はタイトル機能が付いています。
+※列どうしは半角スペースを空けてください。
+※行は改行することで作成できます！"></textarea>
+
+  <div class="controls">
+    <button id="convert" class="btn-primary">表に変換する</button>
+    <button id="clear" class="btn-danger">入力クリア</button>
+
+    <label>
+      表のレイアウト:
+      <select id="align">
+        <option value="left">左揃え</option>
+        <option value="center" selected>中央揃え</option>
+        <option value="right">右揃え</option>
+      </select>
+    </label>
+
+    <label>
+      <input type="checkbox" id="autoSave" checked> 入力内容を自動保存
+    </label>
+  </div>
+
+  <div id="output"></div>
+
+  <div class="footer">
+    HTML方式は「サイト・ブログ」向けに &lt;table&gt; タグを発行します。<br>
+    TSV方式は「Googleスプレッドシート」や「Excel」等にそのままコピペできる方式です。
+    <div class="copyright" id="copyright"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const input = $('input');
+const output = $('output');
+const convertBtn = $('convert');
+const clearBtn = $('clear');
+const alignSelect = $('align');
+const autoSaveCheck = $('autoSave');
+const copyrightEl = $('copyright');
+
+const STORAGE_KEY = 'Standalone-Easy-Table';
+
+// コピーライト年度の自動表示
+const currentYear = new Date().getFullYear();
+copyrightEl.innerHTML = `&copy; 2016&ndash;${currentYear} しくいち (Licensed under GPLv3)`;
+
+// 生成データの保持用
+let currentGeneratedHtml = '';
+let currentGeneratedTsv = '';
+
+// 初期ロード
+window.addEventListener('load', () => {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try {
+      const d = JSON.parse(saved);
+      input.value = d.text || '';
+      alignSelect.value = d.align || 'center';
+      autoSaveCheck.checked = d.autoSave ?? true;
+    } catch (e) {
+      console.warn('ローカルストレージデータの解析に失敗しました');
+    }
+  }
+});
+
+// 入力内容を保存
+function save() {
+  if (!autoSaveCheck.checked) return;
+  const data = {
+    text: input.value,
+    align: alignSelect.value,
+    autoSave: autoSaveCheck.checked
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+[input, alignSelect, autoSaveCheck].forEach(el => el.addEventListener('change', save));
+input.addEventListener('input', save);
+
+// 入力内容を変換処理
+convertBtn.addEventListener('click', () => {
+  const src = input.value.trim();
+  if (!src) return alert('表にしたい内容を入力してください');
+
+  const lines = src.split('\n').map(l => l.trim()).filter(l => l);
+  if (lines.length === 0) return;
+
+  // 1行目がタイトルか判定
+  let title = '';
+  let dataStart = 0;
+
+  if (lines.length > 1) {
+    const firstCells = lines[0].split(/\s+/).filter(c => c);
+    const secondCells = lines[1].split(/\s+/).filter(c => c);
+    const isTitleLine = firstCells.length <= 1 || firstCells.length !== secondCells.length;
+    if (isTitleLine) {
+      title = lines[0];
+      dataStart = 1;
+    }
+  }
+
+  const dataLines = lines.slice(dataStart);
+  const colCounts = dataLines.map(l => l.split(/\s+/).filter(c => c).length);
+  const maxCols = colCounts.length ? Math.max(...colCounts) : 0;
+
+  if (maxCols === 0) return;
+
+  // HTMLテーブル生成
+  let html = `<table class="text-${alignSelect.value}">\n`;
+
+  // タイトル行（表内）
+  if (title) {
+    html += `  <tr><th class="title" colspan="${maxCols}">${escapeHtml(title)}</th></tr>\n`;
+  }
+
+  // データ行
+  dataLines.forEach((line, i) => {
+    let cells = line.split(/\s+/).filter(c => c);
+    while (cells.length < maxCols) cells.push('');
+    const tag = (dataStart === 0 && i === 0) ? 'th' : 'td';
+    html += '  <tr>\n';
+    cells.forEach(cell => {
+      html += `    <${tag}>${escapeHtml(cell)}</${tag}>\n`;
+    });
+    html += '  </tr>\n';
+  });
+
+  html += '</table>';
+
+  // TSV生成
+  const tsvLines = [];
+  if (title) {
+    const titleRow = [title];
+    while (titleRow.length < maxCols) titleRow.push('');
+    tsvLines.push(titleRow.join('\t'));
+  }
+  dataLines.forEach(line => {
+    const cells = line.split(/\s+/).filter(c => c);
+    while (cells.length < maxCols) cells.push('');
+    tsvLines.push(cells.join('\t'));
+  });
+  const tsv = tsvLines.join('\n');
+
+  currentGeneratedHtml = html;
+  currentGeneratedTsv = tsv;
+
+  // 出力エリア構築
+  output.innerHTML = `
+    <div style="margin-bottom:0.8rem; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <button class="btn-copy" id="btnCopyHtml">HTML方式でコピー</button>
+      <button class="btn-success" id="btnCopyTsv">TSV方式でコピー</button>
+      <span class="copy-msg" id="copySuccessMsg">コピーしました！</span>
+    </div>
+    <div style="border:1px solid #eee; padding:1rem; border-radius:8px; background:#fff;">${html}</div>
+  `;
+
+  $('btnCopyHtml').addEventListener('click', () => copyContent(currentGeneratedHtml, 'HTML'));
+  $('btnCopyTsv').addEventListener('click', () => copyContent(currentGeneratedTsv, 'TSV'));
+
+  save();
+});
+
+// 入力内容をクリア
+clearBtn.addEventListener('click', () => {
+  if (confirm('入力と保存データをすべてクリアしますか？')) {
+    input.value = '';
+    localStorage.removeItem(STORAGE_KEY);
+    output.innerHTML = '';
+    currentGeneratedHtml = '';
+    currentGeneratedTsv = '';
+  }
+});
+
+// クリップボードコピー処理
+function copyContent(text, type) {
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const msg = $('copySuccessMsg');
+    if (msg) {
+      msg.textContent = `${type}方式でクリップボードにコピーしました！`;
+      msg.style.display = 'inline';
+      setTimeout(() => { msg.style.display = 'none'; }, 2000);
+    }
+  }).catch(() => {
+    alert('コピーに失敗しました');
+  });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+</script>
+
+</body>
+</html>
